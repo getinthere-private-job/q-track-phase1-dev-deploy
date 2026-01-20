@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Nginx (React 정적 파일 + API 프록시)
+  nginx:
+    build:
+      context: . # 프로젝트 루트를 context로 설정
+      dockerfile: ./nginx/Dockerfile
+    container_name: q-track-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80" # EB는 포트 80 사용
+
+    networks:
+      - qtrack-network
+
+  # Spring Boot 백엔드 (Dev 모드)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: q-track-backend
+    restart: unless-stopped
+    expose:
+      - "8080" # 내부 네트워크에서만 접근
+    environment:
+      # Spring Profile은 application.properties에서 dev로 설정됨
+      # 필요시 환경 변수 SPRING_PROFILES_ACTIVE로 오버라이드 가능
+
+      # JWT 설정 (dev 모드 기본값 사용 가능)
+      JWT_SECRET: ${JWT_SECRET:-qtrack-secret-key-for-development-only-change-in-production-environment-2024}
+      JWT_EXPIRATION_DAYS: ${JWT_EXPIRATION_DAYS:-5}
+
+      # CORS 설정 (Nginx 포트 80 및 EB 도메인)
+      # Nginx가 포트 80에서 React를 서빙하므로, 클라이언트는 포트 80으로 접근
+      # EB 배포 시 환경 변수로 EB 도메인 추가 필요
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://127.0.0.1,https://hoppscotch.io}
+    networks:
+      - qtrack-network
+
+networks:
+  qtrack-network:
+    driver: bridge
